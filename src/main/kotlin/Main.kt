@@ -1,4 +1,5 @@
 import kotlinx.coroutines.*
+import java.awt.MouseInfo
 import java.awt.Point
 import java.awt.Robot
 import java.awt.event.InputEvent
@@ -26,11 +27,11 @@ fun main(){
         val robot=Robot()
         println("Starting frame creation at time: ${System.currentTimeMillis()}")
         val startTime=System.currentTimeMillis()
-        val frame=Frame.createDownScaledFromPosition(1050,32,pointOf(347 to 347),robot)
+        val frame=Frame.createDownScaledFromPosition(32,24,MouseInfo.getPointerInfo().location,robot)
         val endTime=System.currentTimeMillis()
-        val elapsedTime=(endTime-startTime).toFloat()/10000f
+        val elapsedTime=(endTime-startTime).toFloat()/1000f
         println("Elapsed time: $elapsedTime")
-        println("Result frame is: $frame")
+        println("Result frame is: \n$frame")
 
 
 

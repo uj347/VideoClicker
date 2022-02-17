@@ -4,6 +4,7 @@ import java.awt.Robot
 import java.lang.StringBuilder
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.coroutineContext
+import kotlin.math.round
 
 data class Frame private constructor (val frameData:Array<Array<Int>>) {
 
@@ -51,8 +52,17 @@ data class Frame private constructor (val frameData:Array<Array<Int>>) {
         for(yInd in 0 until size) {
             append("[ ")
             for (xInd in 0 until size) {
-                append(frameData[xInd][yInd])
+                val hexCode=Integer.toHexString(frameData[xInd][yInd])
+                append(
+                    when(hexCode.lowercase()){
+                        "ffffffff"->"."
+                        else->"#"
+                    }
+
+
+                    )
                 append(" ")
+
             }
             append("]\n")
         }
@@ -118,11 +128,9 @@ data class Frame private constructor (val frameData:Array<Array<Int>>) {
             val initialSize=input.size
             val positionsToSkip:Int=when{
                 (scaleToSize>initialSize) ->throw IllegalArgumentException("scaleToSize must be less or equal then initial size")
-                (scaleToSize==initialSize)->0
+                (scaleToSize==initialSize||initialSize/scaleToSize==1)->0
                 (scaleToSize==0||initialSize==0)->throw IllegalArgumentException("sizes most be greater then 0")
-                else->{
-                    initialSize/scaleToSize
-                }
+                else->initialSize/scaleToSize
             }.also { println("Points to skip: $it") }
 
            return async(dispatcher) {
@@ -130,15 +138,22 @@ data class Frame private constructor (val frameData:Array<Array<Int>>) {
                 val resultXIndex=AtomicInteger(0)
                println("Scale to size is : $scaleToSize")
                 for(offset:Int in 0 until initialSize){
-                    if(offset%positionsToSkip==0&&offset!=0) {
-                        println("Current offsset is $offset")
-                        val newDataIndex=(initialSize/offset)-1
-                        println("Asigning terget frame#$newDataIndex")
-                        newData[newDataIndex]=operationForEach(input[offset])
+                    //todo problem is here
+                   if(positionsToSkip!=0) {
+                        if (offset % positionsToSkip == 0 && offset != 0) {
+                            println("Current offsset is $offset")
+                            val newDataIndex = (initialSize / offset) - 1
+                            println("Asigning terget frame#$newDataIndex")
+                            newData[newDataIndex] = operationForEach(input[offset])
 
-                    }else if (resultXIndex.get()==scaleToSize-1){
-                        println("Side branch")
-                        newData[scaleToSize-1]=operationForEach(input[input.lastIndex])
+                        }
+                        else if (resultXIndex.get() == scaleToSize - 1) {
+                            println("Side branch")
+                            newData[scaleToSize - 1] = operationForEach(input[input.lastIndex])
+                        }
+                    }else{
+                        if (offset==scaleToSize)break
+                        newData[offset]=operationForEach(input[offset])
                     }
 
                 }
