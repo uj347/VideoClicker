@@ -1,12 +1,11 @@
 import kotlinx.coroutines.*
-import java.awt.GraphicsDevice
 import java.awt.Point
-import java.awt.Rectangle
 import java.awt.Robot
 import java.lang.StringBuilder
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.coroutineContext
 
-data class Frame private constructor (val frameData:Array<IntArray>) {
+data class Frame private constructor (val frameData:Array<Array<Int>>) {
 
     val size=frameData.size
 
@@ -65,13 +64,16 @@ data class Frame private constructor (val frameData:Array<IntArray>) {
             val virtualStartPoint= produceVirtualPoint(realPoint,halfFrame)
             val vStartX=virtualStartPoint.x
             val vStartY=virtualStartPoint.y
-            val newFrameData:Array<IntArray> = Array(frameSize,{_->IntArray(frameSize)})
+            val newFrameData:Array<Array<Int>> = Array(frameSize,{_-> arrayOf() })
             CoroutineScope(coroutineContext).launch {
                 for(xOffset:Int in 0 until frameSize){
                    this.launch(Dispatchers.IO){
                         for (yOffset: Int in 0 until frameSize) {
                             ensureActive()
-                            newFrameData[xOffset][yOffset] = robot.getPixelColor(vStartX + xOffset, vStartY + yOffset).rgb
+                            newFrameData[xOffset][yOffset] =
+                                robot
+                                    .getPixelColor(vStartX + xOffset, vStartY + yOffset)
+                                    .rgb
                         }
                     }
                 }
@@ -79,6 +81,71 @@ data class Frame private constructor (val frameData:Array<IntArray>) {
             }.join()
                 return Frame(newFrameData)
             }
+
+
+
+        suspend fun createDownScaledFromPosition(initialFrameSize: Int,scaleToSize:Int,realPoint: Point,robot:Robot):Frame{
+            val scope= CoroutineScope(coroutineContext)
+
+            val halfFrame=initialFrameSize/2
+            val virtualStartPoint= produceVirtualPoint(realPoint,halfFrame)
+            val vStartX=virtualStartPoint.x
+            val vStartY=virtualStartPoint.y
+            val virtualFullFrame= Array<Array<Point>>(initialFrameSize){xInd->
+                Array<Point>(initialFrameSize){yInd->
+                    Point(vStartX+xInd,vStartY+yInd)
+                }
+            }
+
+            //TODO
+           val deferrs = scope.performDownScaledArrayMapping<Array<Point>,Array<Int>>(
+                virtualFullFrame,scaleToSize,Dispatchers.Default, Array<Int>(scaleToSize){0}){pointAr->
+                    scope.performDownScaledArrayMapping<Point,Int>(pointAr,scaleToSize,Dispatchers.Default,0){
+                        robot.getPixelColor(it.x,it.y).rgb
+                    }.await()
+               }
+                deferrs.join()
+          return Frame(deferrs.getCompleted())
+        }
+        
+        
+        inline fun <reified T,reified R> CoroutineScope.performDownScaledArrayMapping(input:Array<T>,
+                                                                                        scaleToSize:Int,
+                                                                                      dispatcher: CoroutineDispatcher,
+                                                                                      defValue:R,
+
+                                                                     crossinline operationForEach:suspend (T)->R):Deferred<Array<R>>{
+            val initialSize=input.size
+            val positionsToSkip:Int=when{
+                (scaleToSize>initialSize) ->throw IllegalArgumentException("scaleToSize must be less or equal then initial size")
+                (scaleToSize==initialSize)->0
+                (scaleToSize==0||initialSize==0)->throw IllegalArgumentException("sizes most be greater then 0")
+                else->{
+                    initialSize/scaleToSize
+                }
+            }.also { println("Points to skip: $it") }
+
+           return async(dispatcher) {
+               val newData:Array<R> = Array(scaleToSize){_->defValue }
+                val resultXIndex=AtomicInteger(0)
+               println("Scale to size is : $scaleToSize")
+                for(offset:Int in 0 until initialSize){
+                    if(offset%positionsToSkip==0&&offset!=0) {
+                        println("Current offsset is $offset")
+                        val newDataIndex=(initialSize/offset)-1
+                        println("Asigning terget frame#$newDataIndex")
+                        newData[newDataIndex]=operationForEach(input[offset])
+
+                    }else if (resultXIndex.get()==scaleToSize-1){
+                        println("Side branch")
+                        newData[scaleToSize-1]=operationForEach(input[input.lastIndex])
+                    }
+
+                }
+               newData
+            }
+
+        }
 
 
         private  fun produceVirtualPoint(realPoint: Point,halfFrame:Int):Point{

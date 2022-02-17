@@ -1,9 +1,9 @@
 import kotlinx.coroutines.*
-import java.awt.MouseInfo
+import java.awt.Point
 import java.awt.Robot
 import java.awt.event.InputEvent
 
-fun main(){
+fun main111(){
 runBlocking {
 
     VideoClicker(this.coroutineContext, frameSizePixs = 16){p,f,r->
@@ -20,4 +20,32 @@ runBlocking {
     awaitCancellation()
 
 }
+}
+fun main(){
+    runBlocking {
+        val robot=Robot()
+        println("Starting frame creation at time: ${System.currentTimeMillis()}")
+        val startTime=System.currentTimeMillis()
+        val frame=Frame.createDownScaledFromPosition(1050,32,pointOf(347 to 347),robot)
+        val endTime=System.currentTimeMillis()
+        val elapsedTime=(endTime-startTime).toFloat()/10000f
+        println("Elapsed time: $elapsedTime")
+        println("Result frame is: $frame")
+
+
+
+
+
+
+
+    }
+
+
+}
+
+
+
+
+ fun pointOf(intPair:Pair<Int,Int>):Point{
+    return Point(intPair.first,intPair.second)
 }
